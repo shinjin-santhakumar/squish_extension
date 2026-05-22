@@ -21,17 +21,24 @@ async function updatePylancePaths(userDirs: string[], stubsDir: string): Promise
     const existingExtra = pythonConfig.get<string[]>("extraPaths") ?? [];
     const ourDirs = new Set(userDirs);
     const otherExtra = existingExtra.filter((p) => !ourDirs.has(p));
-    const mergedExtra = [...userDirs, ...otherExtra];
-    await pythonConfig.update("extraPaths", mergedExtra, vscode.ConfigurationTarget.Workspace);
+    await pythonConfig.update("extraPaths", [...userDirs, ...otherExtra], vscode.ConfigurationTarget.Workspace);
 
-    // stubPath: points to our stubs dir so Pylance picks up builtins.pyi and recognises
-    // Squish globals (test, object, waitForObject etc.) without needing an import
-    const existingStub = pythonConfig.get<string[]>("stubPath") ?? [];
-    if (!existingStub.includes(stubsDir)) {
-      await pythonConfig.update("stubPath", [stubsDir, ...existingStub], vscode.ConfigurationTarget.Workspace);
+    // stubPath is a single string in Pylance — points to our stubs dir so Pylance
+    // picks up builtins.pyi and recognises Squish globals without needing an import
+    await pythonConfig.update("stubPath", stubsDir, vscode.ConfigurationTarget.Workspace);
+
+    // Suppress reportUndefinedVariable for Squish globals (test, object, etc.)
+    // that are injected at runtime and cannot be represented as normal Python imports
+    const overrides = pythonConfig.get<Record<string, string>>("diagnosticSeverityOverrides") ?? {};
+    if (overrides["reportUndefinedVariable"] !== "none") {
+      await pythonConfig.update(
+        "diagnosticSeverityOverrides",
+        { ...overrides, reportUndefinedVariable: "none" },
+        vscode.ConfigurationTarget.Workspace
+      );
     }
 
-    outputChannel.appendLine(`[Squish] Updated python.analysis.extraPaths + stubPath`);
+    outputChannel.appendLine(`[Squish] Updated python.analysis.extraPaths, stubPath, and diagnosticSeverityOverrides`);
   } catch (err) {
     outputChannel.appendLine(`[Squish] Could not update Pylance paths: ${String(err)}`);
   }
