@@ -13,6 +13,24 @@ let client: LanguageClient | undefined;
 let statusBarItem: vscode.StatusBarItem;
 let outputChannel: vscode.OutputChannel;
 
+async function updatePylancePaths(userDirs: string[]): Promise<void> {
+  if (userDirs.length === 0) {
+    return;
+  }
+  try {
+    const pythonConfig = vscode.workspace.getConfiguration("python.analysis");
+    const existing = pythonConfig.get<string[]>("extraPaths") ?? [];
+    // Keep any existing paths that aren't ours, append after our ordered list
+    const ours = new Set(userDirs);
+    const others = existing.filter((p) => !ours.has(p));
+    const merged = [...userDirs, ...others];
+    await pythonConfig.update("extraPaths", merged, vscode.ConfigurationTarget.Workspace);
+    outputChannel.appendLine(`[Squish] Updated python.analysis.extraPaths (${merged.length} entries, apollo first)`);
+  } catch (err) {
+    outputChannel.appendLine(`[Squish] Could not update python.analysis.extraPaths: ${String(err)}`);
+  }
+}
+
 async function resolveGlobalScriptDirs(): Promise<string[]> {
   const config = vscode.workspace.getConfiguration("squishHelper");
   const batFilePath = config.get<string>("batFilePath") ?? "";
@@ -66,6 +84,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   context.subscriptions.push(statusBarItem);
 
   const userDirs = await resolveGlobalScriptDirs();
+  await updatePylancePaths(userDirs);
+
   const stubsDir = context.asAbsolutePath("stubs");
   const workspaceDirs = (vscode.workspace.workspaceFolders ?? []).map((f) => f.uri.fsPath);
   const globalScriptDirs = [stubsDir, ...workspaceDirs, ...userDirs];
@@ -114,6 +134,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   context.subscriptions.push(
     vscode.commands.registerCommand("squishHelper.rescan", async () => {
       const updatedDirs = await resolveGlobalScriptDirs();
+      await updatePylancePaths(updatedDirs);
       await client?.sendNotification("squish/updateDirs", {
         globalScriptDirs: buildDirList(updatedDirs),
       });
@@ -124,6 +145,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     vscode.workspace.onDidChangeConfiguration(async (event) => {
       if (event.affectsConfiguration("squishHelper")) {
         const updatedDirs = await resolveGlobalScriptDirs();
+        await updatePylancePaths(updatedDirs);
         await client?.sendNotification("squish/updateDirs", {
           globalScriptDirs: buildDirList(updatedDirs),
         });

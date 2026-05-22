@@ -42,6 +42,24 @@ const squishSettings_1 = require("./squishSettings");
 let client;
 let statusBarItem;
 let outputChannel;
+async function updatePylancePaths(userDirs) {
+    if (userDirs.length === 0) {
+        return;
+    }
+    try {
+        const pythonConfig = vscode.workspace.getConfiguration("python.analysis");
+        const existing = pythonConfig.get("extraPaths") ?? [];
+        // Keep any existing paths that aren't ours, append after our ordered list
+        const ours = new Set(userDirs);
+        const others = existing.filter((p) => !ours.has(p));
+        const merged = [...userDirs, ...others];
+        await pythonConfig.update("extraPaths", merged, vscode.ConfigurationTarget.Workspace);
+        outputChannel.appendLine(`[Squish] Updated python.analysis.extraPaths (${merged.length} entries, apollo first)`);
+    }
+    catch (err) {
+        outputChannel.appendLine(`[Squish] Could not update python.analysis.extraPaths: ${String(err)}`);
+    }
+}
 async function resolveGlobalScriptDirs() {
     const config = vscode.workspace.getConfiguration("squishHelper");
     const batFilePath = config.get("batFilePath") ?? "";
@@ -88,6 +106,7 @@ async function activate(context) {
     statusBarItem.show();
     context.subscriptions.push(statusBarItem);
     const userDirs = await resolveGlobalScriptDirs();
+    await updatePylancePaths(userDirs);
     const stubsDir = context.asAbsolutePath("stubs");
     const workspaceDirs = (vscode.workspace.workspaceFolders ?? []).map((f) => f.uri.fsPath);
     const globalScriptDirs = [stubsDir, ...workspaceDirs, ...userDirs];
@@ -123,6 +142,7 @@ async function activate(context) {
     }
     context.subscriptions.push(vscode.commands.registerCommand("squishHelper.rescan", async () => {
         const updatedDirs = await resolveGlobalScriptDirs();
+        await updatePylancePaths(updatedDirs);
         await client?.sendNotification("squish/updateDirs", {
             globalScriptDirs: buildDirList(updatedDirs),
         });
@@ -130,6 +150,7 @@ async function activate(context) {
     context.subscriptions.push(vscode.workspace.onDidChangeConfiguration(async (event) => {
         if (event.affectsConfiguration("squishHelper")) {
             const updatedDirs = await resolveGlobalScriptDirs();
+            await updatePylancePaths(updatedDirs);
             await client?.sendNotification("squish/updateDirs", {
                 globalScriptDirs: buildDirList(updatedDirs),
             });

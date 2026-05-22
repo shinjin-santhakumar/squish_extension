@@ -66,30 +66,25 @@ connection.onInitialized(async () => {
     connection.client.register(node_1.DidChangeConfigurationNotification.type, undefined);
 });
 connection.onCompletion((params) => {
-    const triggerChar = params.context?.triggerCharacter;
-    if (triggerChar === ".") {
-        const doc = documents.get(params.textDocument.uri);
-        if (doc) {
-            const offset = doc.offsetAt(params.position);
-            const textBefore = doc.getText({ start: { line: 0, character: 0 }, end: params.position });
-            // Strip the trailing dot, then find the identifier immediately before it
-            const withoutDot = textBefore.slice(0, -1);
-            const identMatch = withoutDot.match(/([A-Za-z_][A-Za-z0-9_]*)$/);
-            if (identMatch) {
-                const ident = identMatch[1];
-                const parentClass = KNOWN_INSTANCES[ident];
-                if (parentClass) {
-                    return symbolTable
-                        .filter((sym) => sym.parentClass === parentClass)
-                        .map((sym) => ({
-                        label: sym.name,
-                        kind: node_1.CompletionItemKind.Method,
-                        data: symbolTable.indexOf(sym),
-                    }));
-                }
+    const doc = documents.get(params.textDocument.uri);
+    if (doc) {
+        const textBefore = doc.getText({ start: { line: 0, character: 0 }, end: params.position });
+        // Match "identifier." immediately before the cursor regardless of how completion was triggered
+        const dotMatch = textBefore.match(/([A-Za-z_][A-Za-z0-9_]*)\.$/);
+        if (dotMatch) {
+            const parentClass = KNOWN_INSTANCES[dotMatch[1]];
+            if (parentClass) {
+                return symbolTable
+                    .filter((sym) => sym.parentClass === parentClass)
+                    .map((sym) => ({
+                    label: sym.name,
+                    kind: node_1.CompletionItemKind.Method,
+                    data: symbolTable.indexOf(sym),
+                }));
             }
+            // Dot after an unknown identifier — don't pollute with global symbols
+            return [];
         }
-        return [];
     }
     return symbolTable
         .filter((sym) => sym.kind !== "method")
