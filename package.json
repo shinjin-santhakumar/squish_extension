@@ -1,0 +1,66 @@
+{
+  "name": "squish-helper",
+  "displayName": "Squish Helper",
+  "description": "Autocomplete for Squish global script symbols in Python test files",
+  "version": "0.1.0",
+  "publisher": "squish-helper",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": ["Other"],
+  "activationEvents": ["onLanguage:python"],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "squishHelper.rescan",
+        "title": "Squish Helper: Rescan Global Script Directories"
+      }
+    ],
+    "configuration": {
+      "title": "Squish Helper",
+      "properties": {
+        "squishHelper.batFilePath": {
+          "type": "string",
+          "default": "",
+          "description": "Absolute path to the Squish bat file that sets SQUISH_USER_SETTINGS_DIR and related env vars."
+        },
+        "squishHelper.globalScriptBasePath": {
+          "type": "string",
+          "default": "C:\\",
+          "description": "Base path used to resolve relative global script paths (e.g. '/Squish Global Scripts/foo' becomes '<basePath>/Squish Global Scripts/foo')."
+        },
+        "squishHelper.globalScriptDirs": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": [],
+          "description": "Manual list of absolute paths to global script directories. Used when batFilePath is not set."
+        },
+        "squishHelper.squishPrefix": {
+          "type": "string",
+          "default": "",
+          "description": "Path to the Squish installation directory (e.g. C:\\Squish_Windows_9.1.0)."
+        },
+        "squishHelper.squishProjectDir": {
+          "type": "string",
+          "default": "",
+          "description": "Path to the directory containing .project and .pydevproject (the Squish Global Scripts Eclipse project). Used to resolve global script source paths automatically."
+        }
+      }
+    }
+  },
+  "dependencies": {
+    "vscode-languageclient": "^9.0.0",
+    "vscode-languageserver": "^9.0.0",
+    "vscode-languageserver-textdocument": "^1.0.11"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/vscode": "^1.85.0",
+    "typescript": "^5.3.0"
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./"
+  }
+}
