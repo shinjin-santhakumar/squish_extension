@@ -39,10 +39,13 @@ function deduplicateSymbols(symbols) {
     });
 }
 async function rebuildSymbolTable() {
+    connection.console.log(`[Squish] Scanning ${globalScriptDirs.length} directories:`);
+    for (const dir of globalScriptDirs) {
+        connection.console.log(`  → ${dir}`);
+    }
     const raw = await (0, symbolEngine_1.scanDirectories)(globalScriptDirs);
-    // Dirs are ordered workspace-first, so deduplication keeps the workspace version
-    // of any symbol that also exists in a global script repo.
     symbolTable = deduplicateSymbols(raw);
+    connection.console.log(`[Squish] Done — ${raw.length} raw symbols, ${symbolTable.length} after dedup`);
     connection.sendNotification("squish/symbolsLoaded", { count: symbolTable.length });
 }
 connection.onInitialize((params) => {

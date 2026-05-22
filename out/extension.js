@@ -41,6 +41,7 @@ const node_1 = require("vscode-languageclient/node");
 const squishSettings_1 = require("./squishSettings");
 let client;
 let statusBarItem;
+let outputChannel;
 async function resolveGlobalScriptDirs() {
     const config = vscode.workspace.getConfiguration("squishHelper");
     const batFilePath = config.get("batFilePath") ?? "";
@@ -50,10 +51,18 @@ async function resolveGlobalScriptDirs() {
     // Preferred: parse .project + .pydevproject for accurate source paths
     const reposBase = config.get("reposBasePath") ?? "";
     if (projectDir.trim().length > 0) {
+        outputChannel.appendLine(`[Squish] squishProjectDir = ${projectDir.trim()}`);
+        outputChannel.appendLine(`[Squish] reposBasePath    = ${reposBase.trim() || "(not set, falling back to squishProjectDir)"}`);
         try {
-            return (0, squishSettings_1.resolveProjectSourcePaths)(projectDir.trim(), reposBase.trim() || undefined);
+            const dirs = (0, squishSettings_1.resolveProjectSourcePaths)(projectDir.trim(), reposBase.trim() || undefined);
+            outputChannel.appendLine(`[Squish] Resolved ${dirs.length} source paths from .pydevproject:`);
+            for (const d of dirs) {
+                outputChannel.appendLine(`  → ${d}`);
+            }
+            return dirs;
         }
         catch (err) {
+            outputChannel.appendLine(`[Squish] ERROR reading project files: ${String(err)}`);
             vscode.window.showWarningMessage(`Squish Helper: Failed to parse project files in "${projectDir}": ${String(err)}`);
         }
     }
@@ -70,6 +79,9 @@ async function resolveGlobalScriptDirs() {
     return manualDirs;
 }
 async function activate(context) {
+    outputChannel = vscode.window.createOutputChannel("Squish Helper");
+    outputChannel.show(true);
+    context.subscriptions.push(outputChannel);
     statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
     statusBarItem.text = "$(symbol-misc) Squish: loading…";
     statusBarItem.tooltip = "Squish Helper — global script symbols";
@@ -78,8 +90,12 @@ async function activate(context) {
     const userDirs = await resolveGlobalScriptDirs();
     const stubsDir = context.asAbsolutePath("stubs");
     const workspaceDirs = (vscode.workspace.workspaceFolders ?? []).map((f) => f.uri.fsPath);
-    // Order: stubs → open workspace (highest priority) → configured global script dirs
     const globalScriptDirs = [stubsDir, ...workspaceDirs, ...userDirs];
+    outputChannel.appendLine(`[Squish] Workspace folders: ${workspaceDirs.join(", ") || "(none)"}`);
+    outputChannel.appendLine(`[Squish] Final dir list sent to server (${globalScriptDirs.length} total):`);
+    for (const d of globalScriptDirs) {
+        outputChannel.appendLine(`  ${d}`);
+    }
     const serverModule = context.asAbsolutePath(path.join("out", "server.js"));
     const serverOptions = {
         run: { module: serverModule, transport: node_1.TransportKind.ipc },
