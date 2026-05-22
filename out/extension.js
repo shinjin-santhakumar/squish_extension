@@ -76,7 +76,9 @@ async function activate(context) {
     context.subscriptions.push(statusBarItem);
     const userDirs = await resolveGlobalScriptDirs();
     const stubsDir = context.asAbsolutePath("stubs");
-    const globalScriptDirs = [stubsDir, ...userDirs];
+    const workspaceDirs = (vscode.workspace.workspaceFolders ?? []).map((f) => f.uri.fsPath);
+    // Order: stubs → open workspace (highest priority) → configured global script dirs
+    const globalScriptDirs = [stubsDir, ...workspaceDirs, ...userDirs];
     const serverModule = context.asAbsolutePath(path.join("out", "server.js"));
     const serverOptions = {
         run: { module: serverModule, transport: node_1.TransportKind.ipc },
@@ -98,17 +100,21 @@ async function activate(context) {
         statusBarItem.text = `$(symbol-misc) Squish: ${params.count} symbols`;
     });
     await client.start();
+    function buildDirList(updatedUserDirs) {
+        const ws = (vscode.workspace.workspaceFolders ?? []).map((f) => f.uri.fsPath);
+        return [stubsDir, ...ws, ...updatedUserDirs];
+    }
     context.subscriptions.push(vscode.commands.registerCommand("squishHelper.rescan", async () => {
         const updatedDirs = await resolveGlobalScriptDirs();
         await client?.sendNotification("squish/updateDirs", {
-            globalScriptDirs: [stubsDir, ...updatedDirs],
+            globalScriptDirs: buildDirList(updatedDirs),
         });
     }));
     context.subscriptions.push(vscode.workspace.onDidChangeConfiguration(async (event) => {
         if (event.affectsConfiguration("squishHelper")) {
             const updatedDirs = await resolveGlobalScriptDirs();
             await client?.sendNotification("squish/updateDirs", {
-                globalScriptDirs: [stubsDir, ...updatedDirs],
+                globalScriptDirs: buildDirList(updatedDirs),
             });
         }
     }));

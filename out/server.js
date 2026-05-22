@@ -26,8 +26,23 @@ function kindToCompletionKind(kind) {
             return node_1.CompletionItemKind.Method;
     }
 }
+function deduplicateSymbols(symbols) {
+    const seen = new Set();
+    return symbols.filter((sym) => {
+        // Methods are keyed by parentClass.name so same-named methods on different classes are kept
+        const key = sym.parentClass ? `${sym.parentClass}.${sym.name}` : sym.name;
+        if (seen.has(key)) {
+            return false;
+        }
+        seen.add(key);
+        return true;
+    });
+}
 async function rebuildSymbolTable() {
-    symbolTable = await (0, symbolEngine_1.scanDirectories)(globalScriptDirs);
+    const raw = await (0, symbolEngine_1.scanDirectories)(globalScriptDirs);
+    // Dirs are ordered workspace-first, so deduplication keeps the workspace version
+    // of any symbol that also exists in a global script repo.
+    symbolTable = deduplicateSymbols(raw);
     connection.sendNotification("squish/symbolsLoaded", { count: symbolTable.length });
 }
 connection.onInitialize((params) => {

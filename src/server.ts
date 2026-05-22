@@ -44,8 +44,24 @@ function kindToCompletionKind(kind: SquishSymbol["kind"]): CompletionItemKind {
   }
 }
 
+function deduplicateSymbols(symbols: SquishSymbol[]): SquishSymbol[] {
+  const seen = new Set<string>();
+  return symbols.filter((sym) => {
+    // Methods are keyed by parentClass.name so same-named methods on different classes are kept
+    const key = sym.parentClass ? `${sym.parentClass}.${sym.name}` : sym.name;
+    if (seen.has(key)) {
+      return false;
+    }
+    seen.add(key);
+    return true;
+  });
+}
+
 async function rebuildSymbolTable(): Promise<void> {
-  symbolTable = await scanDirectories(globalScriptDirs);
+  const raw = await scanDirectories(globalScriptDirs);
+  // Dirs are ordered workspace-first, so deduplication keeps the workspace version
+  // of any symbol that also exists in a global script repo.
+  symbolTable = deduplicateSymbols(raw);
   connection.sendNotification("squish/symbolsLoaded", { count: symbolTable.length });
 }
 

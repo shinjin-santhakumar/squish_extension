@@ -54,7 +54,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
   const userDirs = await resolveGlobalScriptDirs();
   const stubsDir = context.asAbsolutePath("stubs");
-  const globalScriptDirs = [stubsDir, ...userDirs];
+  const workspaceDirs = (vscode.workspace.workspaceFolders ?? []).map((f) => f.uri.fsPath);
+  // Order: stubs → open workspace (highest priority) → configured global script dirs
+  const globalScriptDirs = [stubsDir, ...workspaceDirs, ...userDirs];
 
   const serverModule = context.asAbsolutePath(path.join("out", "server.js"));
 
@@ -88,11 +90,16 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
   await client.start();
 
+  function buildDirList(updatedUserDirs: string[]): string[] {
+    const ws = (vscode.workspace.workspaceFolders ?? []).map((f) => f.uri.fsPath);
+    return [stubsDir, ...ws, ...updatedUserDirs];
+  }
+
   context.subscriptions.push(
     vscode.commands.registerCommand("squishHelper.rescan", async () => {
       const updatedDirs = await resolveGlobalScriptDirs();
       await client?.sendNotification("squish/updateDirs", {
-        globalScriptDirs: [stubsDir, ...updatedDirs],
+        globalScriptDirs: buildDirList(updatedDirs),
       });
     })
   );
@@ -102,7 +109,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       if (event.affectsConfiguration("squishHelper")) {
         const updatedDirs = await resolveGlobalScriptDirs();
         await client?.sendNotification("squish/updateDirs", {
-          globalScriptDirs: [stubsDir, ...updatedDirs],
+          globalScriptDirs: buildDirList(updatedDirs),
         });
       }
     })
