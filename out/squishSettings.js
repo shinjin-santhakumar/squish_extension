@@ -86,7 +86,7 @@ function parseProjectFile(projectFilePath) {
     const linkBlocks = extractXmlTagContent(xml, "link");
     for (const block of linkBlocks) {
         const nameEl = block.match(/<name>([^<]+)<\/name>/);
-        const locEl = block.match(/<location>([^<]+)<\/location>/);
+        const locEl = block.match(/<location>([\s\S]*?)<\/location>/);
         if (nameEl && locEl) {
             linkedResources.push({ name: nameEl[1].trim(), location: locEl[1].trim() });
         }
