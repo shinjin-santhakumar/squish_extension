@@ -44,7 +44,12 @@
         "squishHelper.squishProjectDir": {
           "type": "string",
           "default": "",
-          "description": "Path to the directory containing .project and .pydevproject (the Squish Global Scripts Eclipse project). Used to resolve global script source paths automatically."
+          "description": "Path to the directory containing .project and .pydevproject (the Squish Global Scripts Eclipse project)."
+        },
+        "squishHelper.reposBasePath": {
+          "type": "string",
+          "default": "",
+          "description": "The root folder where your repos are checked out. This is what <PROJECT_PATH> means in your .project linked resources (e.g. C:\\repos if your repos are at C:\\repos\\apollo, C:\\repos\\wiz_utils, etc.). If not set, falls back to squishProjectDir."
         }
       }
     }

@@ -111,11 +111,17 @@ function parsePydevProjectFile(pydevFilePath) {
  * and resolves them via <linkedResources> in .project, where <PROJECT_PATH>
  * is the directory containing .project itself.
  */
-function resolveProjectSourcePaths(projectDir) {
+/**
+ * projectDir  — folder containing .project and .pydevproject
+ * reposBase   — value that <PROJECT_PATH> resolves to in linked resource locations
+ *               (your repos root, e.g. C:\repos). Falls back to projectDir if not supplied.
+ */
+function resolveProjectSourcePaths(projectDir, reposBase) {
     const projectFile = path.join(projectDir, ".project");
     const pydevFile = path.join(projectDir, ".pydevproject");
     const { projectName, linkedResources } = parseProjectFile(projectFile);
     const sourcePaths = parsePydevProjectFile(pydevFile);
+    const base = reposBase ?? projectDir;
     const linkMap = new Map(linkedResources.map((r) => [r.name, r.location]));
     const prefix = `/${projectName}/`;
     const resolved = [];
@@ -125,7 +131,7 @@ function resolveProjectSourcePaths(projectDir) {
             const location = linkMap.get(linkName);
             if (location) {
                 const absolute = location
-                    .replace("<PROJECT_PATH>", projectDir)
+                    .replace("<PROJECT_PATH>", base)
                     .replace(/\//g, path.sep);
                 resolved.push(absolute);
             }

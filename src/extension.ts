@@ -20,9 +20,11 @@ async function resolveGlobalScriptDirs(): Promise<string[]> {
   const projectDir = config.get<string>("squishHelper.squishProjectDir") ?? config.get<string>("squishProjectDir") ?? "";
 
   // Preferred: parse .project + .pydevproject for accurate source paths
+  const reposBase = config.get<string>("reposBasePath") ?? "";
+
   if (projectDir.trim().length > 0) {
     try {
-      return resolveProjectSourcePaths(projectDir.trim());
+      return resolveProjectSourcePaths(projectDir.trim(), reposBase.trim() || undefined);
     } catch (err) {
       vscode.window.showWarningMessage(
         `Squish Helper: Failed to parse project files in "${projectDir}": ${String(err)}`

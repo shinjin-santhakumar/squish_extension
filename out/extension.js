@@ -48,9 +48,10 @@ async function resolveGlobalScriptDirs() {
     const manualDirs = config.get("globalScriptDirs") ?? [];
     const projectDir = config.get("squishHelper.squishProjectDir") ?? config.get("squishProjectDir") ?? "";
     // Preferred: parse .project + .pydevproject for accurate source paths
+    const reposBase = config.get("reposBasePath") ?? "";
     if (projectDir.trim().length > 0) {
         try {
-            return (0, squishSettings_1.resolveProjectSourcePaths)(projectDir.trim());
+            return (0, squishSettings_1.resolveProjectSourcePaths)(projectDir.trim(), reposBase.trim() || undefined);
         }
         catch (err) {
             vscode.window.showWarningMessage(`Squish Helper: Failed to parse project files in "${projectDir}": ${String(err)}`);
