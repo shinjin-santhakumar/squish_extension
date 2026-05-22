@@ -42,22 +42,25 @@ const squishSettings_1 = require("./squishSettings");
 let client;
 let statusBarItem;
 let outputChannel;
-async function updatePylancePaths(userDirs) {
-    if (userDirs.length === 0) {
-        return;
-    }
+async function updatePylancePaths(userDirs, stubsDir) {
     try {
         const pythonConfig = vscode.workspace.getConfiguration("python.analysis");
-        const existing = pythonConfig.get("extraPaths") ?? [];
-        // Keep any existing paths that aren't ours, append after our ordered list
-        const ours = new Set(userDirs);
-        const others = existing.filter((p) => !ours.has(p));
-        const merged = [...userDirs, ...others];
-        await pythonConfig.update("extraPaths", merged, vscode.ConfigurationTarget.Workspace);
-        outputChannel.appendLine(`[Squish] Updated python.analysis.extraPaths (${merged.length} entries, apollo first)`);
+        // extraPaths: global script dirs in priority order so Pylance resolves imports correctly
+        const existingExtra = pythonConfig.get("extraPaths") ?? [];
+        const ourDirs = new Set(userDirs);
+        const otherExtra = existingExtra.filter((p) => !ourDirs.has(p));
+        const mergedExtra = [...userDirs, ...otherExtra];
+        await pythonConfig.update("extraPaths", mergedExtra, vscode.ConfigurationTarget.Workspace);
+        // stubPath: points to our stubs dir so Pylance picks up builtins.pyi and recognises
+        // Squish globals (test, object, waitForObject etc.) without needing an import
+        const existingStub = pythonConfig.get("stubPath") ?? [];
+        if (!existingStub.includes(stubsDir)) {
+            await pythonConfig.update("stubPath", [stubsDir, ...existingStub], vscode.ConfigurationTarget.Workspace);
+        }
+        outputChannel.appendLine(`[Squish] Updated python.analysis.extraPaths + stubPath`);
     }
     catch (err) {
-        outputChannel.appendLine(`[Squish] Could not update python.analysis.extraPaths: ${String(err)}`);
+        outputChannel.appendLine(`[Squish] Could not update Pylance paths: ${String(err)}`);
     }
 }
 async function resolveGlobalScriptDirs() {
@@ -105,9 +108,9 @@ async function activate(context) {
     statusBarItem.tooltip = "Squish Helper — global script symbols";
     statusBarItem.show();
     context.subscriptions.push(statusBarItem);
-    const userDirs = await resolveGlobalScriptDirs();
-    await updatePylancePaths(userDirs);
     const stubsDir = context.asAbsolutePath("stubs");
+    const userDirs = await resolveGlobalScriptDirs();
+    await updatePylancePaths(userDirs, stubsDir);
     const workspaceDirs = (vscode.workspace.workspaceFolders ?? []).map((f) => f.uri.fsPath);
     const globalScriptDirs = [stubsDir, ...workspaceDirs, ...userDirs];
     outputChannel.appendLine(`[Squish] Workspace folders: ${workspaceDirs.join(", ") || "(none)"}`);
@@ -142,7 +145,7 @@ async function activate(context) {
     }
     context.subscriptions.push(vscode.commands.registerCommand("squishHelper.rescan", async () => {
         const updatedDirs = await resolveGlobalScriptDirs();
-        await updatePylancePaths(updatedDirs);
+        await updatePylancePaths(updatedDirs, stubsDir);
         await client?.sendNotification("squish/updateDirs", {
             globalScriptDirs: buildDirList(updatedDirs),
         });
@@ -150,7 +153,7 @@ async function activate(context) {
     context.subscriptions.push(vscode.workspace.onDidChangeConfiguration(async (event) => {
         if (event.affectsConfiguration("squishHelper")) {
             const updatedDirs = await resolveGlobalScriptDirs();
-            await updatePylancePaths(updatedDirs);
+            await updatePylancePaths(updatedDirs, stubsDir);
             await client?.sendNotification("squish/updateDirs", {
                 globalScriptDirs: buildDirList(updatedDirs),
             });

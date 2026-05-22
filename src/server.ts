@@ -113,13 +113,25 @@ connection.onCompletion(
       }
     }
 
-    return symbolTable
+    const nonMethods = symbolTable
       .filter((sym) => sym.kind !== "method")
       .map((sym, index) => ({
         label: sym.name,
         kind: kindToCompletionKind(sym.kind),
         data: index,
       }));
+
+    // Also include methods in the flat list so they appear when typing directly
+    // e.g. typing "compare" shows "test.compare" without needing to type "test." first
+    const methods = symbolTable
+      .filter((sym) => sym.kind === "method" && sym.parentClass)
+      .map((sym) => ({
+        label: `${sym.parentClass}.${sym.name}`,
+        kind: CompletionItemKind.Method,
+        data: symbolTable.indexOf(sym),
+      }));
+
+    return [...nonMethods, ...methods];
   }
 );
 
